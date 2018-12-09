@@ -1,0 +1,56 @@
+version: '3'
+services:
+
+  rabbitmq:
+    image: rabbitmq:latest
+    ports:
+      - "5672:5672"
+
+  app_producer:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    command: /app/producer.rb
+    environment:
+      - ELASTICSEARCH_HOST=elasticsearch
+      - RABBITMQ_HOST=rabbitmq
+      - QUEUE_NAME=worker_queue
+    depends_on:
+      - elasticsearch
+      - rabbitmq
+
+  app_worker:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    command: /app/worker.rb
+    deploy:
+      mode: replicated
+      replicas: 10
+    environment:
+      - ELASTICSEARCH_HOST=elasticsearch
+      - RABBITMQ_HOST=rabbitmq
+      - QUEUE_NAME=worker_queue
+    depends_on:
+      - elasticsearch
+      - rabbitmq
+
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:6.5.2
+    container_name: elasticsearch
+    environment:
+      - cluster.name=docker-cluster
+      - bootstrap.memory_lock=true
+      - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+    volumes:
+      - esdata:/usr/share/elasticsearch/data
+    ports:
+      - 9200:9200
+
+volumes:
+  esdata:
+    driver: local
